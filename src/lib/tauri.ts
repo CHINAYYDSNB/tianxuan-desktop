@@ -129,6 +129,37 @@ export async function sftpWriteText(
   return invoke("sftp_write_text", { id, path, content });
 }
 
+export interface BatchResult {
+  host_id: string;
+  host_name: string;
+  stdout: string;
+  stderr: string;
+  exit_code: number | null;
+  success: boolean;
+  elapsed_ms: number;
+  error: string | null;
+}
+
+export interface CommandHistory {
+  id: string;
+  command: string;
+  host_count: number;
+  executed_at: string;
+  success_count: number;
+  fail_count: number;
+}
+
+export async function batchExec(
+  hostIds: string[],
+  cmd: string,
+): Promise<BatchResult[]> {
+  return invoke<BatchResult[]>("batch_exec", { hostIds, cmd });
+}
+
+export async function listCommandHistory(): Promise<CommandHistory[]> {
+  return invoke<CommandHistory[]>("list_command_history");
+}
+
 export async function sshOpenSession(id: string, sessionId: string): Promise<void> {
   return invoke("ssh_open_session", { id, sessionId });
 }
