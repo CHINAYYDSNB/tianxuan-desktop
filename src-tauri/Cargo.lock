@@ -5575,6 +5575,7 @@ dependencies = [
 name = "tianxuan-desktop"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "chrono",
  "keyring",
  "rusqlite",

@@ -10,6 +10,7 @@ pub mod services;
 
 pub struct AppState {
     pub db: Mutex<Connection>,
+    pub terminal: services::terminal::SessionManager,
 }
 
 #[tauri::command]
@@ -45,7 +46,10 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             let conn = init_db(app)?;
-            app.manage(AppState { db: Mutex::new(conn) });
+            app.manage(AppState {
+                db: Mutex::new(conn),
+                terminal: services::terminal::SessionManager::new(),
+            });
             Ok(())
         })
         .plugin(tauri_plugin_sql::Builder::new().build())
@@ -59,6 +63,10 @@ pub fn run() {
             commands::host::get_host,
             commands::host::test_connection,
             commands::host::exec_on_host,
+            commands::ssh::ssh_open_session,
+            commands::ssh::ssh_write,
+            commands::ssh::ssh_resize,
+            commands::ssh::ssh_close_session,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

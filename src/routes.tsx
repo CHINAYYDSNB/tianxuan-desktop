@@ -7,6 +7,7 @@ import HostForm from "./components/host/HostForm";
 import BatchCommand from "./components/batch/BatchCommand";
 import Settings from "./components/settings/Settings";
 import HostEditPage from "./components/host/HostEditPage";
+import TerminalPage from "./components/terminal/TerminalPage";
 
 export const router = createBrowserRouter([
   {
@@ -17,6 +18,7 @@ export const router = createBrowserRouter([
       { path: "hosts", element: <HostList /> },
       { path: "hosts/new", element: <HostForm /> },
       { path: "hosts/:id/edit", element: <HostEditPage /> },
+      { path: "terminal", element: <TerminalPage /> },
       { path: "batch", element: <BatchCommand /> },
       { path: "settings", element: <Settings /> },
     ],

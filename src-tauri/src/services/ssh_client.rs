@@ -5,7 +5,6 @@ use russh::client;
 use russh::ChannelMsg;
 
 use crate::models::Host;
-
 pub struct SshResult {
     pub stdout: String,
     pub stderr: String,

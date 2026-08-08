@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 export interface Host {
   id: string;
@@ -55,4 +56,33 @@ export interface ExecResult {
 
 export async function execOnHost(id: string, command: string): Promise<ExecResult> {
   return invoke<ExecResult>("exec_on_host", { id, command });
+}
+
+export async function sshOpenSession(id: string, sessionId: string): Promise<void> {
+  return invoke("ssh_open_session", { id, sessionId });
+}
+
+export async function sshWrite(sessionId: string, data: Uint8Array): Promise<void> {
+  return invoke("ssh_write", { sessionId, data: Array.from(data) });
+}
+
+export async function sshResize(sessionId: string, cols: number, rows: number): Promise<void> {
+  return invoke("ssh_resize", { sessionId, cols, rows });
+}
+
+export async function sshCloseSession(sessionId: string): Promise<void> {
+  return invoke("ssh_close_session", { sessionId });
+}
+
+export interface TerminalOutputPayload {
+  session_id: string;
+  data: string;
+}
+
+export async function listenTerminalOutput(
+  handler: (p: TerminalOutputPayload) => void,
+): Promise<() => void> {
+  return listen<TerminalOutputPayload>("terminal-output", (event) => {
+    handler(event.payload);
+  });
 }
