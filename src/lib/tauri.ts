@@ -76,6 +76,59 @@ export async function collectMetrics(id: string): Promise<HostMetrics> {
   return invoke<HostMetrics>("collect_metrics", { id });
 }
 
+export interface FileEntry {
+  name: string;
+  path: string;
+  is_dir: boolean;
+  size: number;
+  permissions: number;
+  modified: string;
+}
+
+export async function sftpList(id: string, path: string): Promise<FileEntry[]> {
+  return invoke<FileEntry[]>("sftp_list", { id, path });
+}
+
+export async function sftpUpload(
+  id: string,
+  local: string,
+  remote: string,
+): Promise<void> {
+  return invoke("sftp_upload", { id, local, remote });
+}
+
+export async function sftpDownload(
+  id: string,
+  remote: string,
+  local: string,
+): Promise<void> {
+  return invoke("sftp_download", { id, remote, local });
+}
+
+export async function sftpDelete(id: string, path: string): Promise<void> {
+  return invoke("sftp_delete", { id, path });
+}
+
+export async function sftpRename(
+  id: string,
+  oldPath: string,
+  newPath: string,
+): Promise<void> {
+  return invoke("sftp_rename", { id, oldPath, newPath });
+}
+
+export async function sftpReadText(id: string, path: string): Promise<string> {
+  return invoke<string>("sftp_read_text", { id, path });
+}
+
+export async function sftpWriteText(
+  id: string,
+  path: string,
+  content: string,
+): Promise<void> {
+  return invoke("sftp_write_text", { id, path, content });
+}
+
 export async function sshOpenSession(id: string, sessionId: string): Promise<void> {
   return invoke("ssh_open_session", { id, sessionId });
 }

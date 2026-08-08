@@ -28,6 +28,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 keyring = { version = "3", features = ["windows-native"] }
 russh = { version = "0.62", default-features = false, features = ["ring", "rsa", "flate2"] }
+russh-sftp = "2"
 bytes = "1"
 ssh-key = "=0.7.0-rc.11"
 tokio = { version = "1", features = ["full"] }

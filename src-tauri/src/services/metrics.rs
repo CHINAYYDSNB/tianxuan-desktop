@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 use crate::models::Host;
-use crate::services::ssh_client::{exec, SshResult};
+use crate::services::ssh_client::exec;
 
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct HostMetrics {
@@ -154,7 +154,7 @@ pub async fn collect(host: &Host, password: &str) -> Result<HostMetrics, String>
     Ok(m)
 }
 
-pub fn err_offline(e: &str) -> HostMetrics {
+pub fn err_offline(_e: &str) -> HostMetrics {
     HostMetrics {
         online: false,
         cpu_percent: 0.0,
