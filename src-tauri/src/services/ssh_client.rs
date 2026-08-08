@@ -12,8 +12,7 @@ pub struct SshResult {
     pub exit_code: Option<u32>,
 }
 
-struct SshHandler;
-
+pub struct SshHandler;
 impl client::Handler for SshHandler {
     type Error = russh::Error;
 
