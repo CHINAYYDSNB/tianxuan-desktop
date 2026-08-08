@@ -160,6 +160,10 @@ export async function listCommandHistory(): Promise<CommandHistory[]> {
   return invoke<CommandHistory[]>("list_command_history");
 }
 
+export async function openPanelWindow(id: string): Promise<string> {
+  return invoke<string>("open_panel_window", { id });
+}
+
 export async function sshOpenSession(id: string, sessionId: string): Promise<void> {
   return invoke("ssh_open_session", { id, sessionId });
 }
