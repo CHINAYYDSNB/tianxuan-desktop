@@ -1,11 +1,21 @@
 use tauri::State;
 
 use crate::models::Host;
-use crate::services::{host_service, keyring_store, ssh_client};
+use crate::services::{host_service, keyring_store, metrics, ssh_client};
 use crate::AppState;
 
 fn keyring_key(host_id: &str) -> String {
     format!("host-password:{host_id}")
+}
+
+fn resolve_password(host: &Host) -> Result<String, String> {
+    match &host.auth_type {
+        crate::models::AuthType::Password => {
+            keyring_store::get_password(&keyring_key(&host.id))?
+                .ok_or_else(|| "password not stored in keyring".to_string())
+        }
+        crate::models::AuthType::Key => Err("key-based auth not yet supported".to_string()),
+    }
 }
 
 #[tauri::command]
@@ -64,16 +74,26 @@ pub async fn test_connection(state: State<'_, AppState>, id: String) -> Result<(
             .map_err(|e| e.to_string())?
             .ok_or_else(|| "host not found".to_string())?
     };
-    let password = match &host.auth_type {
-        crate::models::AuthType::Password => {
-            keyring_store::get_password(&keyring_key(&host.id))?
-                .ok_or_else(|| "password not stored in keyring".to_string())?
-        }
-        crate::models::AuthType::Key => {
-            return Err("key-based auth not yet supported".to_string());
-        }
-    };
+    let password = resolve_password(&host)?;
     ssh_client::test_connection(&host, &password).await
+}
+
+#[tauri::command]
+pub async fn collect_metrics(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<metrics::HostMetrics, String> {
+    let host = {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        host_service::get(&conn, &id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "host not found".to_string())?
+    };
+    let password = match resolve_password(&host) {
+        Ok(p) => p,
+        Err(e) => return Ok(metrics::err_offline(&e)),
+    };
+    metrics::collect(&host, &password).await
 }
 
 #[tauri::command]
@@ -88,15 +108,7 @@ pub async fn exec_on_host(
             .map_err(|e| e.to_string())?
             .ok_or_else(|| "host not found".to_string())?
     };
-    let password = match &host.auth_type {
-        crate::models::AuthType::Password => {
-            keyring_store::get_password(&keyring_key(&host.id))?
-                .ok_or_else(|| "password not stored in keyring".to_string())?
-        }
-        crate::models::AuthType::Key => {
-            return Err("key-based auth not yet supported".to_string());
-        }
-    };
+    let password = resolve_password(&host)?;
     let result = ssh_client::exec(&host, &password, &command).await?;
     Ok(serde_json::json!({
         "stdout": result.stdout,

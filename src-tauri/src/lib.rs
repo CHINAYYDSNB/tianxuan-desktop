@@ -63,6 +63,7 @@ pub fn run() {
             commands::host::get_host,
             commands::host::test_connection,
             commands::host::exec_on_host,
+            commands::host::collect_metrics,
             commands::ssh::ssh_open_session,
             commands::ssh::ssh_write,
             commands::ssh::ssh_resize,

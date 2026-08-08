@@ -58,6 +58,24 @@ export async function execOnHost(id: string, command: string): Promise<ExecResul
   return invoke<ExecResult>("exec_on_host", { id, command });
 }
 
+export interface HostMetrics {
+  cpu_percent: number;
+  mem_total_mb: number;
+  mem_used_mb: number;
+  mem_percent: number;
+  disk_total_gb: number;
+  disk_used_gb: number;
+  disk_percent: number;
+  load_1: number;
+  load_5: number;
+  load_15: number;
+  online: boolean;
+}
+
+export async function collectMetrics(id: string): Promise<HostMetrics> {
+  return invoke<HostMetrics>("collect_metrics", { id });
+}
+
 export async function sshOpenSession(id: string, sessionId: string): Promise<void> {
   return invoke("ssh_open_session", { id, sessionId });
 }
