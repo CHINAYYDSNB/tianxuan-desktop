@@ -2,18 +2,19 @@ import { useEffect } from "react";
 import { Link } from "react-router-dom";
 
 import { usePanelStore } from "../../stores/panelStore";
-import { openPanelWindow } from "../../lib/tauri";
+import { usePanelBrowserStore } from "../../stores/panelBrowserStore";
 
 export default function PanelList() {
   const { panels, loading, error, load } = usePanelStore();
+  const enter = usePanelBrowserStore((s) => s.enter);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  async function openPanel(id: string) {
+  async function openPanel(id: string, name: string) {
     try {
-      await openPanelWindow(id);
+      await enter(id, name);
     } catch (e) {
       alert(String(e));
     }
@@ -60,7 +61,7 @@ export default function PanelList() {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => openPanel(p.id)}
+                onClick={() => openPanel(p.id, p.name)}
                 className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-indigo-300 transition hover:border-indigo-500"
               >
                 打开

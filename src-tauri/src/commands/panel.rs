@@ -1,4 +1,4 @@
-use tauri::{Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, State};
 
 use crate::models::{NewPanel, Panel};
 use crate::services::panel_service;
@@ -39,7 +39,7 @@ pub fn get_panel(state: State<'_, AppState>, id: String) -> Result<Option<Panel>
 }
 
 #[tauri::command]
-pub async fn open_panel_window(
+pub async fn open_panel_tab(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
     id: String,
@@ -50,29 +50,44 @@ pub async fn open_panel_window(
             .map_err(|e| e.to_string())?
             .ok_or_else(|| "panel not found".to_string())?
     };
+    let window = app
+        .get_window("main")
+        .ok_or_else(|| "main window not found".to_string())?;
+    let tabs = state.panel_tabs.clone();
+    // create the child webview on a dedicated thread to avoid Windows deadlocks
+    tauri::async_runtime::spawn_blocking(move || tabs.open(&window, &panel))
+        .await
+        .map_err(|e| format!("spawn failed: {e}"))?
+}
 
-    let label = format!("panel-{}", panel.id);
-    let existing = app.get_webview_window(&label);
-    if let Some(win) = existing {
-        let _ = win.set_focus();
-        return Ok(label);
-    }
+#[tauri::command]
+pub fn switch_panel_tab(
+    state: State<'_, AppState>,
+    label: String,
+) -> Result<(), String> {
+    state.panel_tabs.switch(&label)
+}
 
-    let parsed_url = panel
-        .url
-        .parse::<tauri::Url>()
-        .map_err(|e| format!("invalid panel URL: {e}"))?;
+#[tauri::command]
+pub fn hide_panel_tabs(state: State<'_, AppState>) -> Result<(), String> {
+    state.panel_tabs.hide_all();
+    Ok(())
+}
 
-    let win = WebviewWindowBuilder::new(
-        &app,
-        label.clone(),
-        WebviewUrl::External(parsed_url),
-    )
-    .title(format!("{} 面板", panel.name))
-    .inner_size(1280.0, 820.0)
-    .build()
-    .map_err(|e| format!("open panel window failed: {e}"))?;
+#[tauri::command]
+pub fn close_panel_tab(
+    state: State<'_, AppState>,
+    label: String,
+) -> Result<(), String> {
+    state.panel_tabs.close(&label)
+}
 
-    win.show().map_err(|e| e.to_string())?;
-    Ok(label)
+#[tauri::command]
+pub fn list_panel_tabs(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    Ok(state.panel_tabs.open_labels())
+}
+
+#[tauri::command]
+pub fn active_panel_tab(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    Ok(state.panel_tabs.active_label())
 }

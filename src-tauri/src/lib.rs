@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use rusqlite::Connection;
 use tauri::Manager;
@@ -11,6 +11,7 @@ pub mod services;
 pub struct AppState {
     pub db: Mutex<Connection>,
     pub terminal: services::terminal::SessionManager,
+    pub panel_tabs: Arc<services::panel_tabs::PanelTabManager>,
 }
 
 #[tauri::command]
@@ -46,10 +47,22 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             let conn = init_db(app)?;
+            let panel_tabs = Arc::new(services::panel_tabs::PanelTabManager::new());
             app.manage(AppState {
                 db: Mutex::new(conn),
                 terminal: services::terminal::SessionManager::new(),
+                panel_tabs: panel_tabs.clone(),
             });
+
+            if let Some(win) = app.get_window("main") {
+                let win_clone = win.clone();
+                win.on_window_event(move |event| {
+                    if let tauri::WindowEvent::Resized(_) = event {
+                        let _ = panel_tabs.resize_all(&win_clone);
+                    }
+                });
+            }
+
             Ok(())
         })
         .plugin(tauri_plugin_sql::Builder::new().build())
@@ -71,7 +84,12 @@ pub fn run() {
             commands::panel::delete_panel,
             commands::panel::list_panels,
             commands::panel::get_panel,
-            commands::panel::open_panel_window,
+            commands::panel::open_panel_tab,
+            commands::panel::switch_panel_tab,
+            commands::panel::hide_panel_tabs,
+            commands::panel::close_panel_tab,
+            commands::panel::list_panel_tabs,
+            commands::panel::active_panel_tab,
             commands::ssh::ssh_open_session,
             commands::ssh::ssh_write,
             commands::ssh::ssh_resize,

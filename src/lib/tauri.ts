@@ -193,6 +193,26 @@ export async function openPanelWindow(id: string): Promise<string> {
   return invoke<string>("open_panel_window", { id });
 }
 
+export async function openPanelTab(id: string): Promise<string> {
+  return invoke<string>("open_panel_tab", { id });
+}
+
+export async function switchPanelTab(label: string): Promise<void> {
+  return invoke("switch_panel_tab", { label });
+}
+
+export async function hidePanelTabs(): Promise<void> {
+  return invoke("hide_panel_tabs");
+}
+
+export async function closePanelTab(label: string): Promise<void> {
+  return invoke("close_panel_tab", { label });
+}
+
+export async function listPanelTabs(): Promise<string[]> {
+  return invoke<string[]>("list_panel_tabs");
+}
+
 export async function sshOpenSession(id: string, sessionId: string): Promise<void> {
   return invoke("ssh_open_session", { id, sessionId });
 }
