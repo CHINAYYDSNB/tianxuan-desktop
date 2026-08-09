@@ -1,6 +1,6 @@
-use tauri::{Emitter, Manager, State};
+use tauri::{Emitter, State};
 
-use crate::services::{host_service, keyring_store};
+use crate::services::{host_service, keyring_store, ssh_client};
 use crate::AppState;
 
 fn keyring_key(host_id: &str) -> String {
@@ -15,6 +15,10 @@ fn resolve_password(host: &crate::models::Host) -> Result<String, String> {
         }
         crate::models::AuthType::Key => Err("key-based auth not yet supported".to_string()),
     }
+}
+
+fn build_config(host: &crate::models::Host, password: &str) -> ssh_client::SshConfig {
+    ssh_client::SshConfig::from_host_password(host, password)
 }
 
 #[tauri::command]
@@ -37,13 +41,14 @@ pub async fn ssh_open_session(
         session_id
     };
 
-    let mut rx = state.terminal.open(&host, &password, session_id.clone()).await?;
+    let config = build_config(&host, &password);
+    let handle = ssh_client::connect(&config).await?;
+    let conn_key = format!("{}:{}", host.address, host.port);
+    state.terminal.store_connection(&conn_key, handle.clone()).await;
 
-    // forward output to the main window via Tauri event
-    let main_window = app
-        .get_webview_window("main")
-        .ok_or_else(|| "main window not found".to_string())?;
-    let win = main_window.clone();
+    let mut rx = state.terminal.open(&handle, session_id.clone()).await?;
+
+    // forward output to the frontend via global event broadcast
     let sid = session_id.clone();
     tokio::spawn(async move {
         while let Some(chunk) = rx.recv().await {
@@ -51,7 +56,7 @@ pub async fn ssh_open_session(
                 "session_id": sid,
                 "data": chunk,
             });
-            let _ = win.emit("terminal-output", payload);
+            let _ = app.emit("terminal-output", payload);
         }
     });
 

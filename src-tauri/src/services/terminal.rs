@@ -4,8 +4,7 @@ use std::sync::Arc;
 use russh::ChannelMsg;
 use tokio::sync::{mpsc, Mutex};
 
-use crate::models::Host;
-use crate::services::ssh_client::connect_with_password;
+use crate::services::ssh_client::{SshRawHandle, SshResult};
 
 const OUTPUT_BUF: usize = 65536;
 const INPUT_BUF: usize = 65536;
@@ -24,32 +23,29 @@ pub type SessionHandle = Arc<Mutex<HashMap<String, ActiveSession>>>;
 
 pub struct SessionManager {
     sessions: SessionHandle,
+    connections: Arc<Mutex<HashMap<String, SshRawHandle>>>,
 }
 
 impl SessionManager {
     pub fn new() -> Self {
         Self {
             sessions: Arc::new(Mutex::new(HashMap::new())),
+            connections: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
-    pub fn handle(&self) -> SessionHandle {
-        self.sessions.clone()
+    /// Store an authenticated SSH connection keyed by host identity for reuse.
+    pub async fn store_connection(&self, key: &str, handle: SshRawHandle) {
+        self.connections.lock().await.insert(key.to_string(), handle);
     }
 
+    /// Open a PTY shell channel on an existing authenticated connection.
     pub async fn open(
         &self,
-        host: &Host,
-        password: &str,
+        handle: &SshRawHandle,
         session_id: String,
     ) -> Result<mpsc::Receiver<String>, String> {
-        let session = connect_with_password(
-            &host.address,
-            host.port,
-            &host.username,
-            password,
-        )
-        .await?;
+        let session = handle.lock().await;
 
         let mut channel = session
             .channel_open_session()
@@ -161,10 +157,15 @@ impl SessionManager {
     }
 }
 
+pub async fn exec_once(handle: &SshRawHandle, command: &str) -> Result<SshResult, String> {
+    crate::services::ssh_client::exec(handle, command).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::AuthType;
+    use crate::models::{AuthType, Host};
+    use crate::services::ssh_client::{connect, SshAuth, SshConfig};
     use std::time::Duration;
 
     fn test_host() -> Host {
@@ -183,28 +184,31 @@ mod tests {
         )
     }
 
-    fn test_password() -> Option<String> {
-        std::env::var("TX_TEST_PASSWORD").ok()
+    fn test_config() -> Option<SshConfig> {
+        let pw = std::env::var("TX_TEST_PASSWORD").ok()?;
+        let h = test_host();
+        Some(SshConfig {
+            host: h.address,
+            port: h.port,
+            username: h.username,
+            auth: SshAuth::Password { password: pw },
+        })
     }
 
     #[tokio::test]
     async fn test_terminal_echo_roundtrip() {
-        let Some(pw) = test_password() else {
+        let Some(config) = test_config() else {
             eprintln!("SKIP: TX_TEST_PASSWORD not set");
             return;
         };
-        let host = test_host();
+        let handle = connect(&config).await.expect("connect");
         let mgr = SessionManager::new();
-        let mut rx = mgr
-            .open(&host, &pw, "t1".to_string())
-            .await
-            .expect("open session");
+        let mut rx = mgr.open(&handle, "t1".to_string()).await.expect("open session");
 
         tokio::time::sleep(Duration::from_millis(500)).await;
 
-        // clear any initial prompt output
         while let Ok(Some(_)) = tokio::time::timeout(Duration::from_millis(100), rx.recv()).await {
-            // drain
+            // drain initial output
         }
 
         mgr.write("t1", b"echo tianxuan-term-test\r".to_vec())
@@ -235,5 +239,19 @@ mod tests {
             collected.contains("tianxuan-term-test"),
             "expected echo in output, got: {collected:?}"
         );
+    }
+
+    #[tokio::test]
+    async fn test_reuse_connection_for_exec() {
+        let Some(config) = test_config() else {
+            eprintln!("SKIP: TX_TEST_PASSWORD not set");
+            return;
+        };
+        let handle = connect(&config).await.expect("connect");
+        // two execs on the same connection
+        let r1 = exec_once(&handle, "echo one").await.expect("exec1");
+        let r2 = exec_once(&handle, "echo two").await.expect("exec2");
+        assert_eq!(r1.stdout.trim(), "one");
+        assert_eq!(r2.stdout.trim(), "two");
     }
 }

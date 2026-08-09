@@ -1,8 +1,7 @@
-use serde::Serialize;
+﻿use serde::Serialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::models::Host;
-use crate::services::ssh_client::connect_with_password;
+use crate::services::ssh_client::{self, SshConfig};
 use russh_sftp::client::SftpSession;
 use russh_sftp::protocol::OpenFlags;
 
@@ -16,9 +15,9 @@ pub struct FileEntry {
     pub modified: String,
 }
 
-async fn open_sftp(host: &Host, password: &str) -> Result<SftpSession, String> {
-    let session = connect_with_password(&host.address, host.port, &host.username, password)
-        .await?;
+async fn open_sftp(config: &SshConfig) -> Result<SftpSession, String> {
+    let handle = ssh_client::connect(config).await?;
+    let session = handle.lock().await;
     let channel = session
         .channel_open_session()
         .await
@@ -53,8 +52,8 @@ fn entry_from_direntry(entry: &russh_sftp::client::fs::DirEntry) -> FileEntry {
     }
 }
 
-pub async fn list(host: &Host, password: &str, path: &str) -> Result<Vec<FileEntry>, String> {
-    let sftp = open_sftp(host, password).await?;
+pub async fn list(config: &SshConfig, path: &str) -> Result<Vec<FileEntry>, String> {
+    let sftp = open_sftp(config).await?;
     let read_dir = sftp
         .read_dir(path)
         .await
@@ -71,15 +70,14 @@ pub async fn list(host: &Host, password: &str, path: &str) -> Result<Vec<FileEnt
 }
 
 pub async fn upload(
-    host: &Host,
-    password: &str,
+    config: &SshConfig,
     local: &str,
     remote: &str,
 ) -> Result<(), String> {
     let data = tokio::fs::read(local)
         .await
         .map_err(|e| format!("read local file failed: {e}"))?;
-    let sftp = open_sftp(host, password).await?;
+    let sftp = open_sftp(config).await?;
     let mut file = sftp
         .open_with_flags(
             remote,
@@ -99,12 +97,11 @@ pub async fn upload(
 }
 
 pub async fn download(
-    host: &Host,
-    password: &str,
+    config: &SshConfig,
     remote: &str,
     local: &str,
 ) -> Result<(), String> {
-    let sftp = open_sftp(host, password).await?;
+    let sftp = open_sftp(config).await?;
     let mut file = sftp
         .open(remote)
         .await
@@ -118,8 +115,8 @@ pub async fn download(
         .map_err(|e| format!("write local file failed: {e}"))
 }
 
-pub async fn delete(host: &Host, password: &str, path: &str) -> Result<(), String> {
-    let sftp = open_sftp(host, password).await?;
+pub async fn delete(config: &SshConfig, path: &str) -> Result<(), String> {
+    let sftp = open_sftp(config).await?;
     match sftp.metadata(path).await {
         Ok(meta) if meta.is_dir() => {
             sftp.remove_dir(path)
@@ -134,19 +131,18 @@ pub async fn delete(host: &Host, password: &str, path: &str) -> Result<(), Strin
 }
 
 pub async fn rename(
-    host: &Host,
-    password: &str,
+    config: &SshConfig,
     old_path: &str,
     new_path: &str,
 ) -> Result<(), String> {
-    let sftp = open_sftp(host, password).await?;
+    let sftp = open_sftp(config).await?;
     sftp.rename(old_path, new_path)
         .await
         .map_err(|e| format!("rename failed: {e}"))
 }
 
-pub async fn read_text(host: &Host, password: &str, path: &str) -> Result<String, String> {
-    let sftp = open_sftp(host, password).await?;
+pub async fn read_text(config: &SshConfig, path: &str) -> Result<String, String> {
+    let sftp = open_sftp(config).await?;
     let mut file = sftp
         .open(path)
         .await
@@ -159,12 +155,11 @@ pub async fn read_text(host: &Host, password: &str, path: &str) -> Result<String
 }
 
 pub async fn write_text(
-    host: &Host,
-    password: &str,
+    config: &SshConfig,
     path: &str,
     content: &str,
 ) -> Result<(), String> {
-    let sftp = open_sftp(host, password).await?;
+    let sftp = open_sftp(config).await?;
     let mut file = sftp
         .open_with_flags(
             path,
@@ -186,36 +181,28 @@ pub async fn write_text(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::AuthType;
+    use crate::services::ssh_client::SshAuth;
 
-    fn test_host() -> Host {
-        Host::new(
-            "SFTP CI".to_string(),
-            std::env::var("TX_TEST_HOST").unwrap_or_else(|_| "47.100.33.169".to_string()),
-            std::env::var("TX_TEST_PORT")
+    fn test_config() -> Option<SshConfig> {
+        let pw = std::env::var("TX_TEST_PASSWORD").ok()?;
+        Some(SshConfig {
+            host: std::env::var("TX_TEST_HOST").unwrap_or_else(|_| "47.100.33.169".to_string()),
+            port: std::env::var("TX_TEST_PORT")
                 .unwrap_or_else(|_| "22".to_string())
                 .parse()
                 .unwrap_or(22),
-            std::env::var("TX_TEST_USER").unwrap_or_else(|_| "root".to_string()),
-            AuthType::Password,
-            "ci".to_string(),
-            "默认".to_string(),
-            vec![],
-        )
-    }
-
-    fn test_password() -> Option<String> {
-        std::env::var("TX_TEST_PASSWORD").ok()
+            username: std::env::var("TX_TEST_USER").unwrap_or_else(|_| "root".to_string()),
+            auth: SshAuth::Password { password: pw },
+        })
     }
 
     #[tokio::test]
     async fn test_sftp_list_root() {
-        let Some(pw) = test_password() else {
+        let Some(config) = test_config() else {
             eprintln!("SKIP: TX_TEST_PASSWORD not set");
             return;
         };
-        let host = test_host();
-        let entries = list(&host, &pw, "/root").await.expect("list failed");
+        let entries = list(&config, "/root").await.expect("list failed");
         assert!(!entries.is_empty(), "should list some entries in /root");
         assert!(entries.iter().any(|e| e.is_dir), "should contain dirs");
         eprintln!(
@@ -226,51 +213,41 @@ mod tests {
 
     #[tokio::test]
     async fn test_sftp_upload_download_roundtrip() {
-        let Some(pw) = test_password() else {
+        let Some(config) = test_config() else {
             eprintln!("SKIP: TX_TEST_PASSWORD not set");
             return;
         };
-        let host = test_host();
         let dir = std::env::temp_dir();
         let remote = format!("/tmp/tianxuan_sftp_test_{}.txt", uuid::Uuid::new_v4());
         let local = dir.join("tianxuan_sftp_test.txt");
 
-        // upload
-        write_text(&host, &pw, &remote, "hello sftp roundtrip").await.expect("write_text");
-        // read back
-        let content = read_text(&host, &pw, &remote).await.expect("read_text");
+        write_text(&config, &remote, "hello sftp roundtrip").await.expect("write_text");
+        let content = read_text(&config, &remote).await.expect("read_text");
         assert_eq!(content, "hello sftp roundtrip");
-        // download to local
-        download(&host, &pw, &remote, local.to_str().unwrap())
-            .await
-            .expect("download");
+        download(&config, &remote, local.to_str().unwrap()).await.expect("download");
         let local_content = tokio::fs::read_to_string(&local).await.unwrap();
         assert_eq!(local_content, "hello sftp roundtrip");
-        // upload local back to another remote path
         let remote2 = format!("{remote}.2");
-        upload(&host, &pw, local.to_str().unwrap(), &remote2)
-            .await
-            .expect("upload");
-        assert_eq!(read_text(&host, &pw, &remote2).await.unwrap(), "hello sftp roundtrip");
-        // cleanup
-        delete(&host, &pw, &remote).await.expect("delete remote");
-        delete(&host, &pw, &remote2).await.expect("delete remote2");
+        upload(&config, local.to_str().unwrap(), &remote2).await.expect("upload");
+        assert_eq!(read_text(&config, &remote2).await.unwrap(), "hello sftp roundtrip");
+        delete(&config, &remote).await.expect("delete remote");
+        delete(&config, &remote2).await.expect("delete remote2");
         let _ = tokio::fs::remove_file(&local).await;
     }
 
     #[tokio::test]
     async fn test_sftp_rename() {
-        let Some(pw) = test_password() else {
+        let Some(config) = test_config() else {
             eprintln!("SKIP: TX_TEST_PASSWORD not set");
             return;
         };
-        let host = test_host();
         let a = format!("/tmp/tianxuan_rename_{}.txt", uuid::Uuid::new_v4());
         let b = format!("{a}.renamed");
-        write_text(&host, &pw, &a, "rename me").await.expect("write");
-        rename(&host, &pw, &a, &b).await.expect("rename");
-        let content = read_text(&host, &pw, &b).await.expect("read renamed");
+        write_text(&config, &a, "rename me").await.expect("write");
+        rename(&config, &a, &b).await.expect("rename");
+        let content = read_text(&config, &b).await.expect("read renamed");
         assert_eq!(content, "rename me");
-        delete(&host, &pw, &b).await.expect("cleanup");
+        delete(&config, &b).await.expect("cleanup");
     }
 }
+

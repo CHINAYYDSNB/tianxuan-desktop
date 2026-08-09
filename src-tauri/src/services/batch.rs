@@ -26,7 +26,13 @@ pub async fn execute(
         let command = command.to_string();
         tasks.push(tokio::spawn(async move {
             let start = std::time::Instant::now();
-            match ssh_client::exec(&host, &password, &command).await {
+            let config = ssh_client::SshConfig::from_host_password(&host, &password);
+            let result = async {
+                let handle = ssh_client::connect(&config).await?;
+                ssh_client::exec(&handle, &command).await
+            }
+            .await;
+            match result {
                 Ok(result) => {
                     let elapsed = start.elapsed().as_millis() as u64;
                     BatchResult {

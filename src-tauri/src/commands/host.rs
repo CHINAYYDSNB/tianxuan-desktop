@@ -76,7 +76,8 @@ pub async fn test_connection(state: State<'_, AppState>, id: String) -> Result<(
             .ok_or_else(|| "host not found".to_string())?
     };
     let password = resolve_password(&host)?;
-    ssh_client::test_connection(&host, &password).await
+    let config = ssh_client::SshConfig::from_host_password(&host, &password);
+    ssh_client::test_connection(&config).await
 }
 
 #[tauri::command]
@@ -94,7 +95,8 @@ pub async fn collect_metrics(
         Ok(p) => p,
         Err(e) => return Ok(metrics::err_offline(&e)),
     };
-    metrics::collect(&host, &password).await
+    let config = ssh_client::SshConfig::from_host_password(&host, &password);
+    metrics::collect(&config).await
 }
 
 #[tauri::command]
@@ -110,7 +112,9 @@ pub async fn exec_on_host(
             .ok_or_else(|| "host not found".to_string())?
     };
     let password = resolve_password(&host)?;
-    let result = ssh_client::exec(&host, &password, &command).await?;
+    let config = ssh_client::SshConfig::from_host_password(&host, &password);
+    let handle = ssh_client::connect(&config).await?;
+    let result = ssh_client::exec(&handle, &command).await?;
     Ok(serde_json::json!({
         "stdout": result.stdout,
         "stderr": result.stderr,

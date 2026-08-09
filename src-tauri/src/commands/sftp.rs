@@ -1,6 +1,8 @@
 use tauri::State;
 
-use crate::services::{host_service, keyring_store, sftp_client};
+use crate::services::{
+    host_service, keyring_store, sftp_client, ssh_client::SshConfig,
+};
 use crate::AppState;
 
 fn keyring_key(host_id: &str) -> String {
@@ -17,10 +19,7 @@ fn resolve_password(host: &crate::models::Host) -> Result<String, String> {
     }
 }
 
-async fn get_host_with_password(
-    state: &State<'_, AppState>,
-    id: &str,
-) -> Result<(crate::models::Host, String), String> {
+async fn get_host_config(state: &State<'_, AppState>, id: &str) -> Result<SshConfig, String> {
     let host = {
         let conn = state.db.lock().map_err(|e| e.to_string())?;
         host_service::get(&conn, id)
@@ -28,7 +27,7 @@ async fn get_host_with_password(
             .ok_or_else(|| "host not found".to_string())?
     };
     let password = resolve_password(&host)?;
-    Ok((host, password))
+    Ok(SshConfig::from_host_password(&host, &password))
 }
 
 #[tauri::command]
@@ -37,8 +36,8 @@ pub async fn sftp_list(
     id: String,
     path: String,
 ) -> Result<Vec<sftp_client::FileEntry>, String> {
-    let (host, password) = get_host_with_password(&state, &id).await?;
-    sftp_client::list(&host, &password, &path).await
+    let config = get_host_config(&state, &id).await?;
+    sftp_client::list(&config, &path).await
 }
 
 #[tauri::command]
@@ -48,8 +47,8 @@ pub async fn sftp_upload(
     local: String,
     remote: String,
 ) -> Result<(), String> {
-    let (host, password) = get_host_with_password(&state, &id).await?;
-    sftp_client::upload(&host, &password, &local, &remote).await
+    let config = get_host_config(&state, &id).await?;
+    sftp_client::upload(&config, &local, &remote).await
 }
 
 #[tauri::command]
@@ -59,8 +58,8 @@ pub async fn sftp_download(
     remote: String,
     local: String,
 ) -> Result<(), String> {
-    let (host, password) = get_host_with_password(&state, &id).await?;
-    sftp_client::download(&host, &password, &remote, &local).await
+    let config = get_host_config(&state, &id).await?;
+    sftp_client::download(&config, &remote, &local).await
 }
 
 #[tauri::command]
@@ -69,8 +68,8 @@ pub async fn sftp_delete(
     id: String,
     path: String,
 ) -> Result<(), String> {
-    let (host, password) = get_host_with_password(&state, &id).await?;
-    sftp_client::delete(&host, &password, &path).await
+    let config = get_host_config(&state, &id).await?;
+    sftp_client::delete(&config, &path).await
 }
 
 #[tauri::command]
@@ -80,8 +79,8 @@ pub async fn sftp_rename(
     old_path: String,
     new_path: String,
 ) -> Result<(), String> {
-    let (host, password) = get_host_with_password(&state, &id).await?;
-    sftp_client::rename(&host, &password, &old_path, &new_path).await
+    let config = get_host_config(&state, &id).await?;
+    sftp_client::rename(&config, &old_path, &new_path).await
 }
 
 #[tauri::command]
@@ -90,8 +89,8 @@ pub async fn sftp_read_text(
     id: String,
     path: String,
 ) -> Result<String, String> {
-    let (host, password) = get_host_with_password(&state, &id).await?;
-    sftp_client::read_text(&host, &password, &path).await
+    let config = get_host_config(&state, &id).await?;
+    sftp_client::read_text(&config, &path).await
 }
 
 #[tauri::command]
@@ -101,6 +100,6 @@ pub async fn sftp_write_text(
     path: String,
     content: String,
 ) -> Result<(), String> {
-    let (host, password) = get_host_with_password(&state, &id).await?;
-    sftp_client::write_text(&host, &password, &path, &content).await
+    let config = get_host_config(&state, &id).await?;
+    sftp_client::write_text(&config, &path, &content).await
 }

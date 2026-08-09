@@ -1,7 +1,6 @@
 ﻿use serde::Serialize;
 
-use crate::models::Host;
-use crate::services::ssh_client::exec;
+use crate::services::ssh_client::{self, SshConfig};
 
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct HostMetrics {
@@ -222,8 +221,9 @@ fn section<'a>(all: &'a str, name: &str) -> Option<&'a str> {
     Some(rest[..end].trim_end())
 }
 
-pub async fn collect(host: &Host, password: &str) -> Result<HostMetrics, String> {
-    let result = exec(host, password, COLLECT_SCRIPT).await?;
+pub async fn collect(config: &SshConfig) -> Result<HostMetrics, String> {
+    let handle = ssh_client::connect(config).await?;
+    let result = ssh_client::exec(&handle, COLLECT_SCRIPT).await?;
     let out = &result.stdout;
 
     let cpu1 = section(out, "STAT1").and_then(|s| parse_cpu(s.trim()));
@@ -443,20 +443,16 @@ Swap:             0           0           0";
             eprintln!("SKIP: TX_TEST_PASSWORD not set");
             return;
         };
-        let host = crate::models::Host::new(
-            "Metrics CI".to_string(),
-            std::env::var("TX_TEST_HOST").unwrap_or_else(|_| "47.100.33.169".to_string()),
-            std::env::var("TX_TEST_PORT")
+        let config = SshConfig {
+            host: std::env::var("TX_TEST_HOST").unwrap_or_else(|_| "47.100.33.169".to_string()),
+            port: std::env::var("TX_TEST_PORT")
                 .unwrap_or_else(|_| "22".to_string())
                 .parse()
                 .unwrap_or(22),
-            std::env::var("TX_TEST_USER").unwrap_or_else(|_| "root".to_string()),
-            crate::models::AuthType::Password,
-            "ci".to_string(),
-            "榛樿".to_string(),
-            vec![],
-        );
-        let m = collect(&host, &pw).await.expect("collect metrics");
+            username: std::env::var("TX_TEST_USER").unwrap_or_else(|_| "root".to_string()),
+            auth: crate::services::ssh_client::SshAuth::Password { password: pw },
+        };
+        let m = collect(&config).await.expect("collect metrics");
         assert!(m.online, "host should be online");
         assert!(m.mem_total_mb > 0, "mem total should be positive");
         assert!(m.cpu_percent >= 0.0 && m.cpu_percent <= 100.0);
