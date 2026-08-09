@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { useHostStore } from "../../stores/hostStore";
 import { collectMetrics, type HostMetrics } from "../../lib/tauri";
+import { useVisibilityPolling } from "../../hooks/useVisibilityPolling";
 
 function ProgressBar({ value, color }: { value: number; color: string }) {
   const clamped = Math.max(0, Math.min(100, value));
@@ -38,29 +40,24 @@ function MetricRow({
 }
 
 function HostCard({ id }: { id: string }) {
+  const navigate = useNavigate();
   const host = useHostStore((s) => s.hosts.find((h) => h.id === id));
   const [metrics, setMetrics] = useState<HostMetrics | null>(null);
+  const [initializing, setInitializing] = useState(true);
+  const [fetchedOnce, setFetchedOnce] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    let timer: ReturnType<typeof setInterval>;
-
-    async function tick() {
-      try {
-        const m = await collectMetrics(id);
-        if (!cancelled) setMetrics(m);
-      } catch {
-        if (!cancelled) setMetrics(null);
-      }
+  useVisibilityPolling(async () => {
+    try {
+      const m = await collectMetrics(id);
+      setMetrics(m);
+      setFetchedOnce(true);
+    } catch {
+      // transient failure: keep previous metrics if any
+      setFetchedOnce(true);
+    } finally {
+      setInitializing(false);
     }
-
-    tick();
-    timer = setInterval(tick, 5000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [id]);
+  });
 
   if (!host) return null;
 
@@ -68,7 +65,10 @@ function HostCard({ id }: { id: string }) {
   const color = online ? "bg-emerald-400" : "bg-zinc-600";
 
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+    <div
+      onClick={() => navigate(`/hosts/${host.id}/workspace`)}
+      className="cursor-pointer rounded-lg border border-zinc-800 bg-zinc-950 p-4 transition hover:border-indigo-500/60 hover:bg-zinc-900"
+    >
       <div className="mb-3 flex items-center justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -124,7 +124,7 @@ function HostCard({ id }: { id: string }) {
         </div>
       ) : (
         <div className="flex h-32 items-center justify-center text-xs text-zinc-600">
-          {online ? "加载中..." : "无法连接 / 凭证缺失"}
+          {initializing || !fetchedOnce ? "加载中..." : "无法连接 / 凭证缺失"}
         </div>
       )}
     </div>
@@ -145,7 +145,7 @@ export default function Dashboard() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold">总览</h1>
         <span className="text-xs text-zinc-500">
-          每 5 秒自动刷新 · {hosts.length} 台主机
+          前台 1s / 后台 10s 自动刷新 · {hosts.length} 台主机
         </span>
       </div>
       {loading && <p className="text-sm text-zinc-500">加载中...</p>}
