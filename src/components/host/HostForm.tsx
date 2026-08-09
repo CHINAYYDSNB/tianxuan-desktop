@@ -1,16 +1,16 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
 
 import { useHostStore } from "../../stores/hostStore";
 import { testConnection, type Host } from "../../lib/tauri";
 
 interface HostFormProps {
   editing?: Host;
+  onSaved?: () => void;
+  onCancel?: () => void;
 }
 
-export default function HostForm({ editing }: HostFormProps) {
-  const navigate = useNavigate();
+export default function HostForm({ editing, onSaved, onCancel }: HostFormProps) {
   const { add, remove } = useHostStore();
 
   const [name, setName] = useState(editing?.name ?? "");
@@ -61,7 +61,7 @@ export default function HostForm({ editing }: HostFormProps) {
     } as const;
     try {
       await add(payload as never, password || undefined);
-      navigate("/hosts");
+      onSaved?.();
     } catch (err) {
       setError(String(err));
     }
@@ -190,12 +190,21 @@ export default function HostForm({ editing }: HostFormProps) {
               onClick={async () => {
                 if (confirm(`删除主机 ${editing.name}？`)) {
                   await remove(editing.id);
-                  navigate("/hosts");
+                  onSaved?.();
                 }
               }}
               className="rounded-md border border-red-500/40 px-4 py-2 text-sm text-red-400 transition hover:bg-red-500/10"
             >
               删除
+            </button>
+          )}
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="ml-auto rounded-md border border-zinc-600 px-4 py-2 text-sm text-zinc-300 transition hover:border-indigo-500"
+            >
+              取消
             </button>
           )}
         </div>

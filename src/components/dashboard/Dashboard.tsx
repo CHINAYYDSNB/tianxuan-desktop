@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useHostStore } from "../../stores/hostStore";
 import { collectMetrics, type HostMetrics } from "../../lib/tauri";
 import { useVisibilityPolling } from "../../hooks/useVisibilityPolling";
+import HostForm from "../host/HostForm";
 
 function ProgressBar({ value, color }: { value: number; color: string }) {
   const clamped = Math.max(0, Math.min(100, value));
@@ -39,7 +40,7 @@ function MetricRow({
   );
 }
 
-function HostCard({ id }: { id: string }) {
+function HostCard({ id, onEdit }: { id: string; onEdit: (id: string) => void }) {
   const navigate = useNavigate();
   const host = useHostStore((s) => s.hosts.find((h) => h.id === id));
   const [metrics, setMetrics] = useState<HostMetrics | null>(null);
@@ -52,7 +53,6 @@ function HostCard({ id }: { id: string }) {
       setMetrics(m);
       setFetchedOnce(true);
     } catch {
-      // transient failure: keep previous metrics if any
       setFetchedOnce(true);
     } finally {
       setInitializing(false);
@@ -67,7 +67,7 @@ function HostCard({ id }: { id: string }) {
   return (
     <div
       onClick={() => navigate(`/hosts/${host.id}/workspace`)}
-      className="cursor-pointer rounded-lg border border-zinc-800 bg-zinc-950 p-4 transition hover:border-indigo-500/60 hover:bg-zinc-900"
+      className="group cursor-pointer rounded-lg border border-zinc-800 bg-zinc-950 p-4 transition hover:border-indigo-500/60 hover:bg-zinc-900"
     >
       <div className="mb-3 flex items-center justify-between">
         <div className="min-w-0">
@@ -86,12 +86,24 @@ function HostCard({ id }: { id: string }) {
             {host.username}@{host.address}
           </div>
         </div>
-        <span
-          className={`h-2.5 w-2.5 shrink-0 rounded-full ${color} ${
-            online ? "animate-pulse" : ""
-          }`}
-          title={online ? "在线" : "离线"}
-        />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(host.id);
+            }}
+            title="编辑主机"
+            className="flex h-6 w-6 items-center justify-center rounded text-xs text-zinc-600 opacity-0 transition hover:bg-zinc-800 hover:text-zinc-200 group-hover:opacity-100"
+          >
+            ✎
+          </button>
+          <span
+            className={`h-2.5 w-2.5 shrink-0 rounded-full ${color} ${
+              online ? "animate-pulse" : ""
+            }`}
+            title={online ? "在线" : "离线"}
+          />
+        </div>
       </div>
 
       {metrics ? (
@@ -133,32 +145,69 @@ function HostCard({ id }: { id: string }) {
 
 export default function Dashboard() {
   const { hosts, loading, load } = useHostStore();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
 
   useEffect(() => {
     load();
   }, [load]);
 
   const hostIds = useMemo(() => hosts.map((h) => h.id), [hosts]);
+  const editingHost = editId ? hosts.find((h) => h.id === editId) : undefined;
+
+  function openAdd() {
+    setEditId(null);
+    setModalOpen(true);
+  }
+
+  function openEdit(id: string) {
+    setEditId(id);
+    setModalOpen(true);
+  }
 
   return (
     <div className="p-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold">总览</h1>
-        <span className="text-xs text-zinc-500">
-          前台 1s / 后台 10s 自动刷新 · {hosts.length} 台主机
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-zinc-500">
+            前台 1s / 后台 10s 自动刷新 · {hosts.length} 台主机
+          </span>
+          <button
+            onClick={openAdd}
+            className="rounded-md bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-400"
+          >
+            + 添加主机
+          </button>
+        </div>
       </div>
+
       {loading && <p className="text-sm text-zinc-500">加载中...</p>}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {hostIds.map((id) => (
-          <HostCard key={id} id={id} />
+          <HostCard key={id} id={id} onEdit={openEdit} />
         ))}
         {!loading && hosts.length === 0 && (
           <div className="rounded-lg border border-dashed border-zinc-700 p-10 text-center text-sm text-zinc-500">
-            还没有主机，先去「主机」页添加
+            还没有主机，点击右上角「添加主机」开始
           </div>
         )}
       </div>
+
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+          <div className="max-h-[90vh] w-full max-w-xl overflow-auto rounded-lg border border-zinc-700 bg-zinc-950">
+            <HostForm
+              editing={editingHost}
+              onCancel={() => setModalOpen(false)}
+              onSaved={() => {
+                setModalOpen(false);
+                load();
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -23,7 +23,6 @@ pub async fn ssh_open_session(
     state: State<'_, AppState>,
     id: String,
     session_id: String,
-    window: tauri::WebviewWindow,
 ) -> Result<(), String> {
     let host = {
         let conn = state.db.lock().map_err(|e| e.to_string())?;
@@ -40,8 +39,11 @@ pub async fn ssh_open_session(
 
     let mut rx = state.terminal.open(&host, &password, session_id.clone()).await?;
 
-    // forward output to the frontend via Tauri event
-    let win_label = window.label().to_string();
+    // forward output to the main window via Tauri event
+    let main_window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "main window not found".to_string())?;
+    let win = main_window.clone();
     let sid = session_id.clone();
     tokio::spawn(async move {
         while let Some(chunk) = rx.recv().await {
@@ -49,9 +51,7 @@ pub async fn ssh_open_session(
                 "session_id": sid,
                 "data": chunk,
             });
-            if let Some(win) = app.clone().get_webview_window(&win_label) {
-                let _ = win.emit("terminal-output", payload);
-            }
+            let _ = win.emit("terminal-output", payload);
         }
     });
 
