@@ -66,6 +66,10 @@ export interface HostMetrics {
   load_1: number;
   load_5: number;
   load_15: number;
+  io_read_kbps: number;
+  io_write_kbps: number;
+  net_rx_kbps: number;
+  net_tx_kbps: number;
   online: boolean;
 }
 

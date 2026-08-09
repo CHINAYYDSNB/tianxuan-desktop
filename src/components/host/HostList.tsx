@@ -1,12 +1,16 @@
 import { useEffect, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { useHostStore } from "../../stores/hostStore";
 import type { Host } from "../../lib/tauri";
 
 function HostRow({ host }: { host: Host }) {
+  const navigate = useNavigate();
   return (
-    <div className="flex items-center gap-4 rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+    <div
+      onClick={() => navigate(`/hosts/${host.id}/workspace`)}
+      className="flex cursor-pointer items-center gap-4 rounded-lg border border-zinc-800 bg-zinc-950 p-3 transition hover:border-indigo-500/60 hover:bg-zinc-900"
+    >
       <div className="flex h-9 w-9 items-center justify-center rounded-md bg-zinc-800 text-sm">
         🖥
       </div>
@@ -29,6 +33,7 @@ function HostRow({ host }: { host: Host }) {
       <div className="flex gap-2">
         <Link
           to={`/hosts/${host.id}/edit`}
+          onClick={(e) => e.stopPropagation()}
           className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition hover:border-indigo-500"
         >
           编辑

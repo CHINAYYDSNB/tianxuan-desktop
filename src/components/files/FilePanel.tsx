@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useHostStore } from "../../stores/hostStore";
 import {
   sftpDelete,
   sftpDownload,
@@ -20,19 +19,11 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
-function permString(mode: number): string {
-  const chars = ["---", "--x", "-w-", "-wx", "r--", "r-x", "rw-", "rwx"];
-  return (
-    (mode & 0o400 ? "d" : "-") +
-    chars[(mode >> 6) & 7] +
-    chars[(mode >> 3) & 7] +
-    chars[mode & 7]
-  );
+interface FilePanelProps {
+  hostId: string;
 }
 
-export default function FileManager() {
-  const { hosts, load } = useHostStore();
-  const [selectedHostId, setSelectedHostId] = useState("");
+export default function FilePanel({ hostId }: FilePanelProps) {
   const [path, setPath] = useState("/root");
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -44,27 +35,23 @@ export default function FileManager() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
   const refresh = useCallback(async () => {
-    if (!selectedHostId) return;
+    if (!hostId) return;
     setLoading(true);
     setError(null);
     try {
-      const items = await sftpList(selectedHostId, path);
+      const items = await sftpList(hostId, path);
       setEntries(items);
     } catch (e) {
       setError(String(e));
     } finally {
       setLoading(false);
     }
-  }, [selectedHostId, path]);
+  }, [hostId, path]);
 
   useEffect(() => {
-    if (selectedHostId) refresh();
-  }, [selectedHostId, path, refresh]);
+    if (hostId) refresh();
+  }, [hostId, path, refresh]);
 
   function goTo(dir: string) {
     setPath(dir);
@@ -77,11 +64,11 @@ export default function FileManager() {
   }
 
   async function handleUpload(file: File) {
-    if (!selectedHostId || !file) return;
+    if (!hostId || !file) return;
     setUploading(true);
     setError(null);
     try {
-      await sftpUpload(selectedHostId, file.name, `${path}/${file.name}`);
+      await sftpUpload(hostId, file.name, `${path}/${file.name}`);
       await refresh();
     } catch (e) {
       setError(String(e));
@@ -91,11 +78,11 @@ export default function FileManager() {
   }
 
   async function handleDownload(entry: FileEntry) {
-    if (!selectedHostId) return;
+    if (!hostId) return;
     setError(null);
     try {
       const local = `C:\\Users\\Administrator\\Downloads\\${entry.name}`;
-      await sftpDownload(selectedHostId, entry.path, local);
+      await sftpDownload(hostId, entry.path, local);
       alert(`已下载到 ${local}`);
     } catch (e) {
       setError(String(e));
@@ -103,11 +90,11 @@ export default function FileManager() {
   }
 
   async function handleDelete(entry: FileEntry) {
-    if (!selectedHostId) return;
+    if (!hostId) return;
     if (!confirm(`确认删除 ${entry.path}？`)) return;
     setError(null);
     try {
-      await sftpDelete(selectedHostId, entry.path);
+      await sftpDelete(hostId, entry.path);
       await refresh();
     } catch (e) {
       setError(String(e));
@@ -115,10 +102,10 @@ export default function FileManager() {
   }
 
   async function openEditor(entry: FileEntry) {
-    if (!selectedHostId) return;
+    if (!hostId) return;
     setError(null);
     try {
-      const content = await sftpReadText(selectedHostId, entry.path);
+      const content = await sftpReadText(hostId, entry.path);
       setEditing(entry);
       setEditContent(content);
     } catch (e) {
@@ -127,10 +114,10 @@ export default function FileManager() {
   }
 
   async function saveEditor() {
-    if (!selectedHostId || !editing) return;
+    if (!hostId || !editing) return;
     setError(null);
     try {
-      await sftpWriteText(selectedHostId, editing.path, editContent);
+      await sftpWriteText(hostId, editing.path, editContent);
       setEditing(null);
       await refresh();
     } catch (e) {
@@ -139,11 +126,11 @@ export default function FileManager() {
   }
 
   async function confirmRename() {
-    if (!selectedHostId || !renameTarget || !renameValue) return;
+    if (!hostId || !renameTarget || !renameValue) return;
     setError(null);
     try {
       const newPath = `${renameTarget.path.slice(0, renameTarget.path.lastIndexOf("/") + 1)}${renameValue}`;
-      await sftpRename(selectedHostId, renameTarget.path, newPath);
+      await sftpRename(hostId, renameTarget.path, newPath);
       setRenameTarget(null);
       await refresh();
     } catch (e) {
@@ -153,28 +140,15 @@ export default function FileManager() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b border-zinc-800 p-3">
-        <select
-          className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
-          value={selectedHostId}
-          onChange={(e) => setSelectedHostId(e.target.value)}
-        >
-          <option value="">选择主机...</option>
-          {hosts.map((h) => (
-            <option key={h.id} value={h.id}>
-              {h.name} ({h.address})
-            </option>
-          ))}
-        </select>
+      <div className="flex items-center gap-2 border-b border-zinc-800 p-2">
         <button
           onClick={goUp}
-          disabled={!selectedHostId || path === "/"}
-          className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 transition hover:border-indigo-500 disabled:opacity-40"
+          disabled={path === "/"}
+          className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 transition hover:border-indigo-500 disabled:opacity-40"
         >
-          ⬆ 上级
+          ⬆
         </button>
-        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-300">
-          <span className="text-zinc-600">~</span>
+        <div className="flex min-w-0 flex-1 items-center gap-1 rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs text-zinc-300">
           <input
             value={path}
             onChange={(e) => setPath(e.target.value)}
@@ -184,15 +158,14 @@ export default function FileManager() {
         </div>
         <button
           onClick={refresh}
-          disabled={!selectedHostId}
-          className="rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-400 disabled:opacity-40"
+          className="rounded-md bg-indigo-500 px-2 py-1 text-xs font-medium text-white transition hover:bg-indigo-400"
         >
           刷新
         </button>
         <button
           onClick={() => fileInputRef.current?.click()}
-          disabled={!selectedHostId || uploading}
-          className="rounded-md border border-zinc-600 px-3 py-1.5 text-sm text-zinc-300 transition hover:border-indigo-500 disabled:opacity-40"
+          disabled={uploading}
+          className="rounded-md border border-zinc-600 px-2 py-1 text-xs text-zinc-300 transition hover:border-indigo-500 disabled:opacity-40"
         >
           {uploading ? "上传中..." : "上传"}
         </button>
@@ -208,28 +181,19 @@ export default function FileManager() {
         />
       </div>
 
-      {error && <p className="px-3 py-2 text-sm text-red-400">{error}</p>}
+      {error && <p className="px-2 py-1 text-xs text-red-400">{error}</p>}
 
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-zinc-900 text-left text-xs text-zinc-500">
-            <tr>
-              <th className="px-4 py-2">名称</th>
-              <th className="px-4 py-2">大小</th>
-              <th className="px-4 py-2">权限</th>
-              <th className="px-4 py-2">修改时间</th>
-              <th className="px-4 py-2 text-right">操作</th>
-            </tr>
-          </thead>
+        <table className="w-full text-xs">
           <tbody>
             {loading && (
               <tr>
-                <td className="px-4 py-3 text-zinc-600">加载中...</td>
+                <td className="px-2 py-2 text-zinc-600">加载中...</td>
               </tr>
             )}
             {!loading && entries.length === 0 && (
               <tr>
-                <td className="px-4 py-3 text-zinc-600">空目录</td>
+                <td className="px-2 py-2 text-zinc-600">空目录</td>
               </tr>
             )}
             {entries.map((entry) => (
@@ -238,36 +202,28 @@ export default function FileManager() {
                 className="border-t border-zinc-800/60 hover:bg-zinc-800/40"
               >
                 <td
-                  className="cursor-pointer px-4 py-2"
+                  className="cursor-pointer truncate px-2 py-1.5"
                   onClick={() => entry.is_dir && goTo(entry.path)}
                 >
-                  <span className="mr-2">
-                    {entry.is_dir ? "📁" : "📄"}
-                  </span>
-                  {entry.name}
+                  <span className="mr-1">{entry.is_dir ? "📁" : "📄"}</span>
+                  <span className="truncate">{entry.name}</span>
                 </td>
-                <td className="px-4 py-2 font-mono text-xs text-zinc-400">
-                  {entry.is_dir ? "-" : formatSize(entry.size)}
+                <td className="px-1 py-1.5 text-right font-mono text-[10px] text-zinc-500">
+                  {entry.is_dir ? "" : formatSize(entry.size)}
                 </td>
-                <td className="px-4 py-2 font-mono text-xs text-zinc-500">
-                  {permString(entry.permissions)}
-                </td>
-                <td className="px-4 py-2 text-xs text-zinc-500">
-                  {entry.modified}
-                </td>
-                <td className="px-4 py-2 text-right">
-                  <div className="flex justify-end gap-1.5 text-xs">
+                <td className="px-1 py-1.5">
+                  <div className="flex justify-end gap-1">
                     {!entry.is_dir && (
                       <>
                         <button
                           onClick={() => openEditor(entry)}
-                          className="rounded border border-zinc-700 px-2 py-1 text-zinc-300 hover:border-indigo-500"
+                          className="rounded border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 hover:border-indigo-500"
                         >
                           编辑
                         </button>
                         <button
                           onClick={() => handleDownload(entry)}
-                          className="rounded border border-zinc-700 px-2 py-1 text-zinc-300 hover:border-indigo-500"
+                          className="rounded border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 hover:border-indigo-500"
                         >
                           下载
                         </button>
@@ -278,15 +234,15 @@ export default function FileManager() {
                         setRenameTarget(entry);
                         setRenameValue(entry.name);
                       }}
-                      className="rounded border border-zinc-700 px-2 py-1 text-zinc-300 hover:border-indigo-500"
+                      className="rounded border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 hover:border-indigo-500"
                     >
-                      重命名
+                      改名
                     </button>
                     <button
                       onClick={() => handleDelete(entry)}
-                      className="rounded border border-red-500/30 px-2 py-1 text-red-400 hover:bg-red-500/10"
+                      className="rounded border border-red-500/30 px-1.5 py-0.5 text-[10px] text-red-400 hover:bg-red-500/10"
                     >
-                      删除
+                      删
                     </button>
                   </div>
                 </td>
@@ -300,7 +256,7 @@ export default function FileManager() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
           <div className="flex h-[80vh] w-[90vw] flex-col overflow-hidden rounded-lg border border-zinc-700 bg-zinc-950">
             <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-2">
-              <span className="font-mono text-sm text-zinc-300">
+              <span className="truncate font-mono text-sm text-zinc-300">
                 编辑 {editing.path}
               </span>
               <div className="flex gap-2">
@@ -330,7 +286,7 @@ export default function FileManager() {
 
       {renameTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-          <div className="w-96 rounded-lg border border-zinc-700 bg-zinc-950 p-4">
+          <div className="w-80 rounded-lg border border-zinc-700 bg-zinc-950 p-4">
             <h3 className="mb-3 text-sm font-medium">重命名</h3>
             <input
               value={renameValue}
