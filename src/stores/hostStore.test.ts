@@ -20,9 +20,6 @@ const sampleHosts = [
     auth_ref: "ref",
     group_name: "生产",
     tags: ["bt"],
-    panel_type: null,
-    panel_url: null,
-    panel_session_ref: null,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
   },
@@ -36,9 +33,6 @@ const sampleHosts = [
     auth_ref: "ref2",
     group_name: "测试",
     tags: [],
-    panel_type: null,
-    panel_url: null,
-    panel_session_ref: null,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
   },
@@ -75,8 +69,6 @@ describe("hostStore", () => {
       auth_type: "password",
       group_name: "生产",
       tags: ["bt"],
-      panel_type: null,
-      panel_url: null,
     });
     expect(mockedInvoke).toHaveBeenNthCalledWith(
       1,

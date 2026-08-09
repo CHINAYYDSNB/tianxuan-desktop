@@ -13,9 +13,16 @@ pub fn run(conn: &Connection) -> rusqlite::Result<()> {
             auth_ref TEXT NOT NULL DEFAULT '',
             group_name TEXT NOT NULL DEFAULT '默认',
             tags TEXT NOT NULL DEFAULT '[]',
-            panel_type TEXT,
-            panel_url TEXT,
-            panel_session_ref TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS panels (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            url TEXT NOT NULL,
+            panel_type TEXT NOT NULL DEFAULT 'bt',
+            session_ref TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
@@ -48,6 +55,7 @@ mod tests {
             .collect::<Result<_, _>>()
             .unwrap();
         assert!(tables.contains(&"hosts".to_string()));
+        assert!(tables.contains(&"panels".to_string()));
         assert!(tables.contains(&"command_history".to_string()));
     }
 

@@ -23,7 +23,6 @@ export default function HostForm({ editing }: HostFormProps) {
   const [password, setPassword] = useState("");
   const [group, setGroup] = useState(editing?.group_name ?? "默认");
   const [tags, setTags] = useState(editing?.tags.join(",") ?? "");
-  const [panelUrl, setPanelUrl] = useState(editing?.panel_url ?? "");
   const [error, setError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [testOk, setTestOk] = useState<boolean | null>(null);
@@ -59,8 +58,6 @@ export default function HostForm({ editing }: HostFormProps) {
       auth_type: authType,
       group_name: group,
       tags: tagList,
-      panel_type: panelUrl ? (editing?.panel_type ?? "bt") : null,
-      panel_url: panelUrl || null,
     } as const;
     try {
       await add(payload as never, password || undefined);
@@ -164,16 +161,6 @@ export default function HostForm({ editing }: HostFormProps) {
             />
           </label>
         </div>
-
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-zinc-400">面板地址（可选，支持宝塔 / 1Panel）</span>
-          <input
-            className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 outline-none focus:border-indigo-500"
-            value={panelUrl}
-            onChange={(e) => setPanelUrl(e.target.value)}
-            placeholder="https://panel.example.com:8888"
-          />
-        </label>
 
         {error && <p className="text-sm text-red-400">{error}</p>}
         {testOk && (

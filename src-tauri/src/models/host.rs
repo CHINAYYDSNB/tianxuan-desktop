@@ -7,13 +7,6 @@ pub enum AuthType {
     Password,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum PanelType {
-    Bt,
-    OnePanel,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Host {
     pub id: String,
@@ -25,9 +18,6 @@ pub struct Host {
     pub auth_ref: String,
     pub group_name: String,
     pub tags: Vec<String>,
-    pub panel_type: Option<PanelType>,
-    pub panel_url: Option<String>,
-    pub panel_session_ref: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -42,8 +32,6 @@ impl Host {
         auth_ref: String,
         group_name: String,
         tags: Vec<String>,
-        panel_type: Option<PanelType>,
-        panel_url: Option<String>,
     ) -> Self {
         let now = chrono::Utc::now().to_rfc3339();
         Self {
@@ -56,9 +44,6 @@ impl Host {
             auth_ref,
             group_name,
             tags,
-            panel_type,
-            panel_url,
-            panel_session_ref: None,
             created_at: now.clone(),
             updated_at: now,
         }
@@ -77,10 +62,6 @@ pub struct NewHost {
     pub group_name: String,
     #[serde(default)]
     pub tags: Vec<String>,
-    #[serde(default)]
-    pub panel_type: Option<PanelType>,
-    #[serde(default)]
-    pub panel_url: Option<String>,
 }
 
 fn default_port() -> u16 {
@@ -104,9 +85,6 @@ impl NewHost {
             auth_ref: String::new(),
             group_name: self.group_name,
             tags: self.tags,
-            panel_type: self.panel_type,
-            panel_url: self.panel_url,
-            panel_session_ref: None,
             created_at: now.clone(),
             updated_at: now,
         }

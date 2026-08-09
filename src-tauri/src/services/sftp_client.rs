@@ -201,8 +201,6 @@ mod tests {
             "ci".to_string(),
             "默认".to_string(),
             vec![],
-            None,
-            None,
         )
     }
 

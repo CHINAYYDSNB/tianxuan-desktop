@@ -11,9 +11,6 @@ export interface Host {
   auth_ref: string;
   group_name: string;
   tags: string[];
-  panel_type: "bt" | "1panel" | null;
-  panel_url: string | null;
-  panel_session_ref: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -23,7 +20,7 @@ export async function listHosts(): Promise<Host[]> {
 }
 
 export async function addHost(
-  host: Omit<Host, "id" | "created_at" | "updated_at" | "panel_session_ref" | "auth_ref">,
+  host: Omit<Host, "id" | "created_at" | "updated_at" | "auth_ref">,
   password?: string,
 ): Promise<Host> {
   return invoke<Host>("add_host", { host, password });
@@ -158,6 +155,34 @@ export async function batchExec(
 
 export async function listCommandHistory(): Promise<CommandHistory[]> {
   return invoke<CommandHistory[]>("list_command_history");
+}
+
+export interface Panel {
+  id: string;
+  name: string;
+  url: string;
+  panel_type: "bt" | "1panel";
+  session_ref: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function listPanels(): Promise<Panel[]> {
+  return invoke<Panel[]>("list_panels");
+}
+
+export async function addPanel(
+  panel: Omit<Panel, "id" | "session_ref" | "created_at" | "updated_at">,
+): Promise<Panel> {
+  return invoke<Panel>("add_panel", { panel });
+}
+
+export async function updatePanel(panel: Panel): Promise<Panel> {
+  return invoke<Panel>("update_panel", { panel });
+}
+
+export async function deletePanel(id: string): Promise<void> {
+  return invoke("delete_panel", { id });
 }
 
 export async function openPanelWindow(id: string): Promise<string> {

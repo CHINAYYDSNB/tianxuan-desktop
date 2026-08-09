@@ -2,17 +2,9 @@ import { useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 
 import { useHostStore } from "../../stores/hostStore";
-import { openPanelWindow, type Host } from "../../lib/tauri";
+import type { Host } from "../../lib/tauri";
 
 function HostRow({ host }: { host: Host }) {
-  async function openPanel() {
-    try {
-      await openPanelWindow(host.id);
-    } catch (e) {
-      alert(String(e));
-    }
-  }
-
   return (
     <div className="flex items-center gap-4 rounded-lg border border-zinc-800 bg-zinc-950 p-3">
       <div className="flex h-9 w-9 items-center justify-center rounded-md bg-zinc-800 text-sm">
@@ -32,18 +24,9 @@ function HostRow({ host }: { host: Host }) {
         </div>
         <div className="text-xs text-zinc-500">
           {host.username}@{host.address}:{host.port}
-          {host.panel_url ? ` · 面板 ${host.panel_url}` : ""}
         </div>
       </div>
       <div className="flex gap-2">
-        {host.panel_url && (
-          <button
-            onClick={openPanel}
-            className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-indigo-300 transition hover:border-indigo-500"
-          >
-            打开面板
-          </button>
-        )}
         <Link
           to={`/hosts/${host.id}/edit`}
           className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition hover:border-indigo-500"

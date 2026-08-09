@@ -11,7 +11,7 @@ interface HostStore {
   loading: boolean;
   error: string | null;
   load: () => Promise<void>;
-  add: (host: Omit<Host, "id" | "created_at" | "updated_at" | "panel_session_ref" | "auth_ref">, password?: string) => Promise<void>;
+  add: (host: Omit<Host, "id" | "created_at" | "updated_at" | "auth_ref">, password?: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
 }
 

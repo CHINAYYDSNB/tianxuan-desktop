@@ -9,6 +9,9 @@ import Settings from "./components/settings/Settings";
 import HostEditPage from "./components/host/HostEditPage";
 import TerminalPage from "./components/terminal/TerminalPage";
 import FileManager from "./components/files/FileManager";
+import PanelList from "./components/panel/PanelList";
+import PanelForm from "./components/panel/PanelForm";
+import PanelEditPage from "./components/panel/PanelEditPage";
 
 export const router = createBrowserRouter([
   {
@@ -21,6 +24,9 @@ export const router = createBrowserRouter([
       { path: "hosts/:id/edit", element: <HostEditPage /> },
       { path: "terminal", element: <TerminalPage /> },
       { path: "files", element: <FileManager /> },
+      { path: "panels", element: <PanelList /> },
+      { path: "panels/new", element: <PanelForm /> },
+      { path: "panels/:id/edit", element: <PanelEditPage /> },
       { path: "batch", element: <BatchCommand /> },
       { path: "settings", element: <Settings /> },
     ],

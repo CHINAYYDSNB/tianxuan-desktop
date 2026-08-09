@@ -262,8 +262,6 @@ Swap:             0           0           0";
             "ci".to_string(),
             "默认".to_string(),
             vec![],
-            None,
-            None,
         );
         let m = collect(&host, &pw).await.expect("collect metrics");
         assert!(m.online, "host should be online");
