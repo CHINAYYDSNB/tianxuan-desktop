@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::models::Host;
+use crate::models::{Host, NewHost};
 use crate::services::{host_service, keyring_store, metrics, ssh_client};
 use crate::AppState;
 
@@ -21,9 +21,10 @@ fn resolve_password(host: &Host) -> Result<String, String> {
 #[tauri::command]
 pub fn add_host(
     state: State<'_, AppState>,
-    host: Host,
+    host: NewHost,
     password: Option<String>,
 ) -> Result<Host, String> {
+    let host = host.into_host();
     if let Some(pw) = password {
         keyring_store::set_password(&keyring_key(&host.id), &pw)?;
     }

@@ -64,3 +64,51 @@ impl Host {
         }
     }
 }
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct NewHost {
+    pub name: String,
+    pub address: String,
+    #[serde(default = "default_port")]
+    pub port: u16,
+    pub username: String,
+    #[serde(default = "default_auth_type")]
+    pub auth_type: AuthType,
+    pub group_name: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub panel_type: Option<PanelType>,
+    #[serde(default)]
+    pub panel_url: Option<String>,
+}
+
+fn default_port() -> u16 {
+    22
+}
+
+fn default_auth_type() -> AuthType {
+    AuthType::Password
+}
+
+impl NewHost {
+    pub fn into_host(self) -> Host {
+        let now = chrono::Utc::now().to_rfc3339();
+        Host {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: self.name,
+            address: self.address,
+            port: self.port,
+            username: self.username,
+            auth_type: self.auth_type,
+            auth_ref: String::new(),
+            group_name: self.group_name,
+            tags: self.tags,
+            panel_type: self.panel_type,
+            panel_url: self.panel_url,
+            panel_session_ref: None,
+            created_at: now.clone(),
+            updated_at: now,
+        }
+    }
+}
